@@ -172,6 +172,9 @@ let audioCtx=null, analyser=null, data=null, raf=null, stream=null;
 let gainNode=null, inputGain=1;
 
 let correct=0,wrong=0,locked=false,wrongReported=false,scaleStep=0;
+let waitingForRelease=false;
+let releaseFrames=0;
+const RELEASE_FRAMES=8;
 const $=id=>document.getElementById(id);
 const gainRange=$("gainRange");
 const gainValue=$("gainValue");
@@ -351,6 +354,8 @@ function handlePitch(pc,f){
 
     if(pc===target.pc){
       locked=true;
+      waitingForRelease=true;
+      releaseFrames=0;
       correct++;
       wrongReported=false;
       updateStats();
@@ -370,6 +375,8 @@ function handlePitch(pc,f){
   if($("scaleQuestion").value==="single"){
     if(scaleTarget.pcs.includes(pc)){
       locked=true;
+      waitingForRelease=true;
+      releaseFrames=0;
       correct++;
       updateStats();
       $("status").textContent=`정답! ${NOTES[pc]}`;
@@ -390,6 +397,8 @@ function handlePitch(pc,f){
 
       if(scaleStep>=7){
         locked=true;
+        waitingForRelease=true;
+        releaseFrames=0;
         correct++;
         updateStats();
         $("status").textContent=`스케일 완주! ${NOTES[scaleTarget.root]} ${SCALE_NAMES[scaleTarget.kind]}`;
@@ -412,14 +421,31 @@ function loop(){
   if(r.freq>0){
     const midi=freqToMidi(r.freq);
     const pc=((midi%12)+12)%12;
-    handlePitch(pc,r.freq);
+    $("detected").textContent=`현재 입력음: ${NOTES[pc]} · ${r.freq.toFixed(1)} Hz`;
+
+    // 방금 맞힌 음을 계속 누르고 있으면 새 문제에 즉시 오답으로
+    // 기록되지 않도록, 실제로 음을 놓을 때까지 판정을 잠시 막는다.
+    if(waitingForRelease){
+      releaseFrames=0;
+    }else{
+      handlePitch(pc,r.freq);
+    }
   }else{
     $("detected").textContent="현재 입력음: —";
+
+    if(waitingForRelease){
+      releaseFrames++;
+      if(releaseFrames>=RELEASE_FRAMES){
+        waitingForRelease=false;
+        releaseFrames=0;
+        $("status").textContent="다음 문제 — 연주하세요.";
+        $("status").className="neutral";
+      }
+    }
   }
 
   raf=requestAnimationFrame(loop);
 }
-
 async function startMic(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({
@@ -447,6 +473,8 @@ async function startMic(){
 
     $("start").textContent="🎙 마이크 끄기";
     $("start").classList.add("mic-on");
+    waitingForRelease=false;
+    releaseFrames=0;
     $("status").textContent="마이크 작동 중 — 연주하세요.";
     $("status").className="neutral";
 
@@ -493,7 +521,13 @@ $("start").onclick=async()=>{
   await startMic();
 };
 
-$("next").onclick=()=>makeQuestion();
+$("next").onclick=()=>{
+  waitingForRelease=true;
+  releaseFrames=0;
+  makeQuestion();
+  $("status").textContent="음이 끊기면 다음 문제를 풀 수 있습니다.";
+  $("status").className="neutral";
+};
 
 $("mode").onchange=()=>{
   $("scaleControls").style.display=$("mode").value==="scale"?"grid":"none";
