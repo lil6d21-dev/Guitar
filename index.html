@@ -111,7 +111,7 @@ details{margin-top:14px;color:#aaa}
   <div>
     <label>스케일 종류</label>
     <select id="scaleType">
-      <option value="all">메이저 · 마이너 · 모드</option>
+      <option value="all">전체 스케일</option>
       <option value="major">메이저 (Ionian)</option>
       <option value="minor">내추럴 마이너 (Aeolian)</option>
       <option value="dorian">Dorian</option>
@@ -119,12 +119,15 @@ details{margin-top:14px;color:#aaa}
       <option value="lydian">Lydian</option>
       <option value="mixolydian">Mixolydian</option>
       <option value="locrian">Locrian</option>
+      <option value="pentatonic">메이저 펜타토닉</option>
+      <option value="minorPentatonic">마이너 펜타토닉</option>
+      <option value="altered">얼터드 스케일</option>
     </select>
   </div>
   <div>
     <label>스케일 연습 방식</label>
     <select id="scaleQuestion">
-      <option value="sequence">7음 순서대로 연주</option>
+      <option value="sequence">구성음 순서대로 연주</option>
       <option value="single">스케일에 포함된 음 맞히기</option>
     </select>
   </div>
@@ -164,8 +167,30 @@ const INSTRUMENTS={
  bass4:{name:"4현 베이스",strings:{4:"E",3:"A",2:"D",1:"G"},open:{1:58,2:53,3:48,4:43}},
  bass5:{name:"5현 베이스",strings:{5:"B",4:"E",3:"A",2:"D",1:"G"},open:{1:58,2:53,3:48,4:43,5:35}}
 };
-const SCALE_INTERVALS={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10],lydian:[0,2,4,6,7,9,11],mixolydian:[0,2,4,5,7,9,10],locrian:[0,1,3,5,6,8,10]};
-const SCALE_NAMES={major:"메이저 (Ionian)",minor:"내추럴 마이너 (Aeolian)",dorian:"Dorian",phrygian:"Phrygian",lydian:"Lydian",mixolydian:"Mixolydian",locrian:"Locrian"};
+const SCALE_INTERVALS={
+  major:[0,2,4,5,7,9,11],
+  minor:[0,2,3,5,7,8,10],
+  dorian:[0,2,3,5,7,9,10],
+  phrygian:[0,1,3,5,7,8,10],
+  lydian:[0,2,4,6,7,9,11],
+  mixolydian:[0,2,4,5,7,9,10],
+  locrian:[0,1,3,5,6,8,10],
+  pentatonic:[0,2,4,7,9],
+  minorPentatonic:[0,3,5,7,10],
+  altered:[0,1,3,4,6,8,10]
+};
+const SCALE_NAMES={
+  major:"메이저 (Ionian)",
+  minor:"내추럴 마이너 (Aeolian)",
+  dorian:"Dorian",
+  phrygian:"Phrygian",
+  lydian:"Lydian",
+  mixolydian:"Mixolydian",
+  locrian:"Locrian",
+  pentatonic:"메이저 펜타토닉",
+  minorPentatonic:"마이너 펜타토닉",
+  altered:"얼터드 스케일"
+};
 
 let currentInstrument="guitar", target=null, scaleTarget=null;
 let audioCtx=null, analyser=null, data=null, raf=null, stream=null;
@@ -252,7 +277,7 @@ function makeScaleQuestion(){
   $("sub").textContent=`${INSTRUMENTS[currentInstrument].name} · ${$("scaleQuestion").value==="sequence"?"루트부터 7음 순서대로":"스케일에 포함된 음 맞히기"}`;
   $("status").textContent=audioCtx?"연주하세요.":"마이크를 시작하세요.";
   $("status").className="neutral";
-  $("progress").textContent=$("scaleQuestion").value==="sequence"?"진행: 0 / 7":"";
+  $("progress").textContent=$("scaleQuestion").value==="sequence"?`진행: 0 / ${scaleTarget.pcs.length}`:"";
 }
 
 function updateStats(){
@@ -377,13 +402,15 @@ function handlePitch(pc,f){
       locked=true;
       waitingForRelease=true;
       releaseFrames=0;
-      correct++;
-      updateStats();
       $("status").textContent=`정답! ${NOTES[pc]}`;
       $("status").className="good";
       setTimeout(()=>makeScaleQuestion(),650);
     }else{
-      registerWrong(`오답 · ${NOTES[pc]}은(는) 이 스케일에 없음`);
+      if(!wrongReported){
+        wrongReported=true;
+        $("status").textContent=`오답 · ${NOTES[pc]}은(는) 이 스케일에 없음`;
+        $("status").className="bad";
+      }
     }
   }else{
     const expected=scaleTarget.pcs[scaleStep];
@@ -393,19 +420,21 @@ function handlePitch(pc,f){
       wrongReported=false;
       $("status").textContent=`정답! ${NOTES[pc]}`;
       $("status").className="good";
-      $("progress").textContent=`진행: ${scaleStep} / 7`;
+      $("progress").textContent=`진행: ${scaleStep} / ${scaleTarget.pcs.length}`;
 
-      if(scaleStep>=7){
+      if(scaleStep>=scaleTarget.pcs.length){
         locked=true;
         waitingForRelease=true;
         releaseFrames=0;
-        correct++;
-        updateStats();
         $("status").textContent=`스케일 완주! ${NOTES[scaleTarget.root]} ${SCALE_NAMES[scaleTarget.kind]}`;
-        setTimeout(()=>makeScaleQuestion(),900);
+        setTimeout(()=>makeScaleQuestion(),650);
       }
     }else{
-      registerWrong(`다음 음: ${NOTES[expected]} · 현재: ${NOTES[pc]}`);
+      if(!wrongReported){
+        wrongReported=true;
+        $("status").textContent=`오답 · 다음 음: ${NOTES[expected]} · 현재: ${NOTES[pc]}`;
+        $("status").className="bad";
+      }
     }
   }
 }
