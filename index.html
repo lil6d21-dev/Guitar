@@ -109,6 +109,24 @@ details{margin-top:14px;color:#aaa}
 
 <div id="scaleControls" class="card controls" style="display:none">
   <div>
+    <label>루트</label>
+    <select id="scaleRoot">
+      <option value="random">랜덤</option>
+      <option value="0">C</option>
+      <option value="1">C#</option>
+      <option value="2">D</option>
+      <option value="3">D#</option>
+      <option value="4">E</option>
+      <option value="5">F</option>
+      <option value="6">F#</option>
+      <option value="7">G</option>
+      <option value="8">G#</option>
+      <option value="9">A</option>
+      <option value="10">A#</option>
+      <option value="11">B</option>
+    </select>
+  </div>
+  <div>
     <label>스케일 종류</label>
     <select id="scaleType">
       <option value="all">전체 스케일</option>
@@ -262,7 +280,8 @@ function makeScaleQuestion(){
   const type=$("scaleType").value;
   const keys=Object.keys(SCALE_INTERVALS);
   const kind=type==="all"?keys[rand(0,keys.length-1)]:type;
-  const root=rand(0,11);
+  const rootValue=$("scaleRoot").value;
+  const root=rootValue==="random"?rand(0,11):Number(rootValue);
 
   scaleTarget={root,kind,pcs:SCALE_INTERVALS[kind].map(i=>(root+i)%12)};
   scaleStep=0;locked=false;wrongReported=false;
@@ -559,6 +578,7 @@ $("instrument").onchange=()=>{
 $("frets").onchange=makeQuestion;
 $("scaleType").onchange=makeQuestion;
 $("scaleQuestion").onchange=makeQuestion;
+$("scaleRoot").onchange=makeQuestion;
 
 buildStringPicker();
 makeQuestion();
