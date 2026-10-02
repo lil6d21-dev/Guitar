@@ -38,7 +38,7 @@ button.secondary{background:#333;color:#fff}button.mic-on{background:#65e48b;col
 .stringBtn{width:auto;min-width:62px;min-height:46px;padding:10px 14px;background:#292929;color:#aaa;border-radius:12px}
 .stringBtn.selected{background:#eee;color:#111}
 .help{color:#aaa;font-size:13px;margin-top:8px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+
 .stat{background:#252525;border-radius:12px;padding:14px}.num{font-size:25px;font-weight:800}
 small{color:#999}.good{color:#65e48b}.bad{color:#ff7272}.neutral{color:#ddd}
 details{margin-top:14px;color:#aaa}
@@ -48,7 +48,7 @@ details{margin-top:14px;color:#aaa}
  .question{font-size:36px;line-height:1.25;padding:25px 5px}
  #status{font-size:19px;min-height:28px}
  #detected{font-size:18px}.controls{grid-template-columns:1fr}
- .stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}
+ .stats .stat:last-child{grid-column:1/-1}
  select,button{font-size:16px;min-height:54px}
 }
 </style>
@@ -138,9 +138,8 @@ details{margin-top:14px;color:#aaa}
   <button id="next" class="secondary">다음 문제</button>
 </div>
 
-<div class="card stats">
-  <div class="stat"><small>정답</small><div id="correct" class="num">0</div></div>
-  <div class="stat"><small>오답</small><div id="wrong" class="num">0</div></div>
+</div>
+  <div class="stat"><small>오답</small></div>
   <div class="stat"><small>정답률</small><div id="rate" class="num">0%</div></div>
 </div>
 
@@ -196,7 +195,7 @@ let currentInstrument="guitar", target=null, scaleTarget=null;
 let audioCtx=null, analyser=null, data=null, raf=null, stream=null;
 let gainNode=null, inputGain=1;
 
-let correct=0,wrong=0,locked=false,wrongReported=false,scaleStep=0;
+let locked=false,wrongReported=false,scaleStep=0;
 let waitingForRelease=false;
 let releaseFrames=0;
 const RELEASE_FRAMES=8;
@@ -280,12 +279,7 @@ function makeScaleQuestion(){
   $("progress").textContent=$("scaleQuestion").value==="sequence"?`진행: 0 / ${scaleTarget.pcs.length}`:"";
 }
 
-function updateStats(){
-  $("correct").textContent=correct;
-  $("wrong").textContent=wrong;
-  const t=correct+wrong;
-  $("rate").textContent=t?Math.round(correct/t*100)+"%":"0%";
-}
+
 
 function freqToMidi(f){return Math.round(69+12*Math.log2(f/440));}
 
@@ -363,9 +357,8 @@ function setSignal(rms){
 
 function registerWrong(msg){
   if(!wrongReported){
-    wrong++;
+    
     wrongReported=true;
-    updateStats();
   }
   $("status").textContent=msg;
   $("status").className="bad";
@@ -381,9 +374,8 @@ function handlePitch(pc,f){
       locked=true;
       waitingForRelease=true;
       releaseFrames=0;
-      correct++;
+      
       wrongReported=false;
-      updateStats();
 
       $("status").textContent=`정답! ${target.string}번줄 ${target.note}`;
       $("status").className="good";
@@ -575,7 +567,6 @@ $("scaleQuestion").onchange=makeQuestion;
 
 buildStringPicker();
 makeQuestion();
-updateStats();
 
 if("serviceWorker"in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){
   window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
