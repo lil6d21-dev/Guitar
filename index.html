@@ -77,6 +77,9 @@ details{margin-top:14px;color:#aaa}
     <select id="mode">
       <option value="fretboard">지판 암기</option>
       <option value="scale">스케일 암기</option>
+      <option value="chordTone">코드톤 암기</option>
+      <option value="interval">인터벌 암기</option>
+      <option value="arpeggio">아르페지오</option>
     </select>
   </div>
   <div>
@@ -151,6 +154,62 @@ details{margin-top:14px;color:#aaa}
   </div>
 </div>
 
+<div id="chordControls" class="card controls" style="display:none">
+  <div>
+    <label>루트</label>
+    <select id="chordRoot">
+      <option value="random">랜덤</option>
+      <option value="0">C</option><option value="1">C#</option><option value="2">D</option>
+      <option value="3">D#</option><option value="4">E</option><option value="5">F</option>
+      <option value="6">F#</option><option value="7">G</option><option value="8">G#</option>
+      <option value="9">A</option><option value="10">A#</option><option value="11">B</option>
+    </select>
+  </div>
+  <div>
+    <label>코드</label>
+    <select id="chordType">
+      <option value="major">Major</option>
+      <option value="minor">Minor</option>
+      <option value="7">7</option>
+      <option value="maj7">Maj7</option>
+      <option value="m7">m7</option>
+      <option value="m7b5">m7♭5</option>
+      <option value="dim7">dim7</option>
+    </select>
+  </div>
+</div>
+
+<div id="intervalControls" class="card controls" style="display:none">
+  <div>
+    <label>기준음</label>
+    <select id="intervalRoot">
+      <option value="random">랜덤</option>
+      <option value="0">C</option><option value="1">C#</option><option value="2">D</option>
+      <option value="3">D#</option><option value="4">E</option><option value="5">F</option>
+      <option value="6">F#</option><option value="7">G</option><option value="8">G#</option>
+      <option value="9">A</option><option value="10">A#</option><option value="11">B</option>
+    </select>
+  </div>
+  <div>
+    <label>인터벌</label>
+    <select id="intervalType">
+      <option value="random">랜덤</option>
+      <option value="1">단2도</option>
+      <option value="2">장2도</option>
+      <option value="3">단3도</option>
+      <option value="4">장3도</option>
+      <option value="5">완전4도</option>
+      <option value="6">증4도/감5도</option>
+      <option value="7">완전5도</option>
+      <option value="8">단6도</option>
+      <option value="9">장6도</option>
+      <option value="10">단7도</option>
+      <option value="11">장7도</option>
+      <option value="12">옥타브</option>
+    </select>
+  </div>
+</div>
+
 <div class="card controls">
   <button id="start">🎙 마이크 시작</button>
   <button id="next" class="secondary">다음 문제</button>
@@ -204,7 +263,24 @@ const SCALE_NAMES={
   altered:"얼터드 스케일"
 };
 
-let currentInstrument="guitar", target=null, scaleTarget=null;
+const CHORD_INTERVALS={
+  major:[0,4,7],
+  minor:[0,3,7],
+  "7":[0,4,7,10],
+  maj7:[0,4,7,11],
+  m7:[0,3,7,10],
+  m7b5:[0,3,6,10],
+  dim7:[0,3,6,9]
+};
+const CHORD_NAMES={
+  major:"Major", minor:"Minor", "7":"7", maj7:"Maj7", m7:"m7", m7b5:"m7♭5", dim7:"dim7"
+};
+const INTERVAL_NAMES={
+  1:"단2도",2:"장2도",3:"단3도",4:"장3도",5:"완전4도",6:"증4도/감5도",
+  7:"완전5도",8:"단6도",9:"장6도",10:"단7도",11:"장7도",12:"옥타브"
+};
+
+let currentInstrument="guitar", target=null, scaleTarget=null, musicTarget=null;
 let audioCtx=null, analyser=null, data=null, raf=null, stream=null;
 let gainNode=null, inputGain=1;
 
@@ -254,7 +330,11 @@ function getSelectedStrings(){
 }
 
 function makeQuestion(){
-  if($("mode").value==="scale"){makeScaleQuestion();return;}
+  const mode=$("mode").value;
+  if(mode==="scale"){makeScaleQuestion();return;}
+  if(mode==="chordTone"){makeChordToneQuestion();return;}
+  if(mode==="interval"){makeIntervalQuestion();return;}
+  if(mode==="arpeggio"){makeArpeggioQuestion();return;}
 
   const strings=getSelectedStrings();
   if(!strings.length)return;
@@ -276,6 +356,67 @@ function makeQuestion(){
   wrongReported=false;
 }
 
+
+function chooseRoot(id){
+  const v=$(id).value;
+  return v==="random"?rand(0,11):Number(v);
+}
+function chooseChordType(){
+  return $("chordType").value;
+}
+function makeChordToneQuestion(){
+  const root=chooseRoot("chordRoot");
+  const kind=chooseChordType();
+  const pcs=CHORD_INTERVALS[kind].map(i=>(root+i)%12);
+  const idx=rand(0,pcs.length-1);
+  const pc=pcs[idx];
+  const degreeNames=["1","♭3","3","♭5","5","♭7","7"];
+  let degree;
+  const iv=CHORD_INTERVALS[kind][idx];
+  const degreeMap={0:"1",3:"♭3",4:"3",6:"♭5",7:"5",9:"6",10:"♭7",11:"7"};
+  degree=degreeMap[iv]||"구성음";
+  musicTarget={mode:"chordTone",root,kind,pcs,pc,index:idx};
+  target={pc,note:NOTES[pc]};
+  scaleTarget=null;
+  locked=false;wrongReported=false;
+  $("question").textContent=`${NOTES[root]} ${CHORD_NAMES[kind]} — ${degree}`;
+  $("sub").textContent=`코드 구성음 중 ${degree} 찾기`;
+  $("status").textContent=audioCtx?"연주하세요.":"마이크를 시작하세요.";
+  $("status").className="neutral";
+  $("progress").textContent="";
+}
+
+function makeIntervalQuestion(){
+  const root=chooseRoot("intervalRoot");
+  const sel=$("intervalType").value;
+  const semis=sel==="random"?rand(1,12):Number(sel);
+  const pc=(root+semis)%12;
+  musicTarget={mode:"interval",root,semis,pc};
+  target={pc,note:NOTES[pc]};
+  scaleTarget=null;
+  locked=false;wrongReported=false;
+  $("question").textContent=`${NOTES[root]} → ${INTERVAL_NAMES[semis]}`;
+  $("sub").textContent=`기준음에서 해당 인터벌의 음을 연주하세요`;
+  $("status").textContent=audioCtx?"연주하세요.":"마이크를 시작하세요.";
+  $("status").className="neutral";
+  $("progress").textContent="";
+}
+
+function makeArpeggioQuestion(){
+  const root=chooseRoot("chordRoot");
+  const kind=chooseChordType();
+  const pcs=CHORD_INTERVALS[kind].map(i=>(root+i)%12);
+  musicTarget={mode:"arpeggio",root,kind,pcs,index:0};
+  target={pc:pcs[0],note:NOTES[pcs[0]]};
+  scaleTarget=null;
+  locked=false;wrongReported=false;
+  $("question").textContent=`${NOTES[root]} ${CHORD_NAMES[kind]} 아르페지오`;
+  $("sub").textContent=`구성음을 루트부터 순서대로 연주하세요`;
+  $("status").textContent=audioCtx?"연주하세요.":"마이크를 시작하세요.";
+  $("status").className="neutral";
+  $("progress").textContent=`진행: 0 / ${pcs.length}`;
+}
+
 function makeScaleQuestion(){
   const type=$("scaleType").value;
   const keys=Object.keys(SCALE_INTERVALS);
@@ -287,7 +428,7 @@ function makeScaleQuestion(){
   scaleStep=0;locked=false;wrongReported=false;
 
   $("question").textContent=`${NOTES[root]} ${SCALE_NAMES[kind]}`;
-  $("sub").textContent=`${INSTRUMENTS[currentInstrument].name} · ${$("scaleQuestion").value==="sequence"?"루트부터 7음 순서대로":"스케일에 포함된 음 맞히기"}`;
+  $("sub").textContent=`${INSTRUMENTS[currentInstrument].name} · ${$("scaleQuestion").value==="sequence"?"루트부터 구성음 순서대로":"스케일에 포함된 음 맞히기"}`;
   $("status").textContent=audioCtx?"연주하세요.":"마이크를 시작하세요.";
   $("status").className="neutral";
   $("progress").textContent=$("scaleQuestion").value==="sequence"?`진행: 0 / ${scaleTarget.pcs.length}`:"";
@@ -397,6 +538,53 @@ function handlePitch(pc,f){
       setTimeout(()=>{if(locked)makeQuestion();},650);
     }else{
       registerWrong(`오답 · 문제: ${target.note} / 현재: ${NOTES[pc]}`);
+    }
+    return;
+  }
+
+  const mode=$("mode").value;
+
+  if(mode==="chordTone"||mode==="interval"){
+    if(locked)return;
+    if(pc===musicTarget.pc){
+      locked=true;
+      waitingForRelease=true;
+      releaseFrames=0;
+      $("status").textContent=`정답! ${NOTES[pc]}`;
+      $("status").className="good";
+      setTimeout(()=>{if(locked)makeQuestion();},650);
+    }else{
+      if(!wrongReported){
+        wrongReported=true;
+        $("status").textContent=`현재 ${NOTES[pc]} · 목표 ${NOTES[musicTarget.pc]}`;
+        $("status").className="bad";
+      }
+    }
+    return;
+  }
+
+  if(mode==="arpeggio"){
+    if(locked)return;
+    const expected=musicTarget.pcs[musicTarget.index];
+    if(pc===expected){
+      musicTarget.index++;
+      wrongReported=false;
+      $("status").textContent=`정답! ${NOTES[pc]}`;
+      $("status").className="good";
+      $("progress").textContent=`진행: ${musicTarget.index} / ${musicTarget.pcs.length}`;
+      if(musicTarget.index>=musicTarget.pcs.length){
+        locked=true;
+        waitingForRelease=true;
+        releaseFrames=0;
+        $("status").textContent=`아르페지오 완료! ${NOTES[musicTarget.root]} ${CHORD_NAMES[musicTarget.kind]}`;
+        setTimeout(()=>makeQuestion(),650);
+      }
+    }else{
+      if(!wrongReported){
+        wrongReported=true;
+        $("status").textContent=`오답 · 다음 음: ${NOTES[expected]} · 현재: ${NOTES[pc]}`;
+        $("status").className="bad";
+      }
     }
     return;
   }
@@ -565,7 +753,10 @@ $("next").onclick=()=>{
 };
 
 $("mode").onchange=()=>{
-  $("scaleControls").style.display=$("mode").value==="scale"?"grid":"none";
+  const mode=$("mode").value;
+  $("scaleControls").style.display=mode==="scale"?"grid":"none";
+  $("chordControls").style.display=(mode==="chordTone"||mode==="arpeggio")?"grid":"none";
+  $("intervalControls").style.display=mode==="interval"?"grid":"none";
   makeQuestion();
 };
 
@@ -578,6 +769,11 @@ $("instrument").onchange=()=>{
 $("frets").onchange=makeQuestion;
 $("scaleType").onchange=makeQuestion;
 $("scaleQuestion").onchange=makeQuestion;
+$("scaleRoot").onchange=makeQuestion;
+$("chordRoot").onchange=makeQuestion;
+$("chordType").onchange=makeQuestion;
+$("intervalRoot").onchange=makeQuestion;
+$("intervalType").onchange=makeQuestion;
 $("scaleRoot").onchange=makeQuestion;
 
 buildStringPicker();
